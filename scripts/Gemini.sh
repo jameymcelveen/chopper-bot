@@ -1,61 +1,63 @@
 #!/bin/bash
 
 # --- Configuration ---
-BRAIN_PKG_DIR="src/chopper-brain"
-DESC_PKG_DIR="src/chopper-description"
+BRAIN_PYTHON_DIR="src/chopper-brain/chopper_brain"
 
-echo "🛠 Syncing Dependencies & URDF Launchers..."
+echo "⚙️ Adding Motor Logic & PWM Bridge..."
 
-# 1. Sync package.xml dependencies for chopper-brain
-# Using a simple grep check before appending to avoid duplicates
-sync_dependency() {
-    local pkg_file=$1
-    local dep=$2
-    if ! grep -q "<exec_depend>$dep</exec_depend>" "$pkg_file"; then
-        echo "➕ Adding $dep to $pkg_file"
-        # Insert before the closing </package> tag
-        sed -i '' "/<\/package>/i \\
-  <exec_depend>$dep</exec_depend>" "$pkg_file"
-    fi
-}
+# 1. Create the Motor Controller Node
+cat <<EOF > "$BRAIN_PYTHON_DIR/motor_node.py"
+import rclpy
+from rclpy.node import Node
+from geometry_msgs.msg import Twist
 
-[ -f "$BRAIN_PKG_DIR/package.xml" ] && sync_dependency "$BRAIN_PKG_DIR/package.xml" "python3-serial"
-[ -f "$BRAIN_PKG_DIR/package.xml" ] && sync_dependency "$BRAIN_PKG_DIR/package.xml" "geometry_msgs"
+class MotorController(Node):
+    def __init__(self):
+        super().__init__('motor_controller')
+        self.subscription = self.create_subscription(
+            Twist,
+            'cmd_vel',
+            self.listener_callback,
+            10)
+        self.get_logger().info("Motor Controller Node Initialized")
 
-# 2. Add Xacro support to chopper-description
-[ -f "$DESC_PKG_DIR/package.xml" ] && sync_dependency "$DESC_PKG_DIR/package.xml" "xacro"
-[ -f "$DESC_PKG_DIR/package.xml" ] && sync_dependency "$DESC_PKG_DIR/package.xml" "robot_state_publisher"
+    def listener_callback(self, msg):
+        # Differential Drive Kinematics
+        linear = msg.linear.x
+        angular = msg.angular.z
+        
+        # Calculate Left and Right wheel speeds (-1.0 to 1.0)
+        left_speed = linear - angular
+        right_speed = linear + angular
+        
+        # TODO: Send these values to your specific ESCs/Motor Drivers
+        # self.get_logger().info(f"Speeds -> L: {left_speed:.2f}, R: {right_speed:.2f}")
 
-# 3. Create a professional Robot Launch file
-# This version actually handles Xacro processing for the Orin Nano
-mkdir -p "$DESC_PKG_DIR/launch"
-cat <<EOF > "$DESC_PKG_DIR/launch/robot-launch.py"
-import os
-from ament_index_python.packages import get_package_share_directory
-from launch import LaunchDescription
-from launch_ros.actions import Node
-import xacro
-
-def generate_launch_description():
-    pkg_path = get_package_share_directory('chopper_description')
-    xacro_file = os.path.join(pkg_path, 'urdf', 'chopper.urdf.xacro')
-    robot_description_config = xacro.process_file(xacro_file)
-
-    return LaunchDescription([
-        Node(
-            package='robot_state_publisher',
-            executable='robot_state_publisher',
-            name='robot_state_publisher',
-            output='screen',
-            parameters=[{'robot_description': robot_description_config.toxml()}]
-        ),
-        Node(
-            package='chopper_brain',
-            executable='spektrum_node',
-            name='spektrum_bridge',
-            output='screen'
-        )
-    ])
+def main(args=None):
+    rclpy.init(args=args)
+    node = MotorController()
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()
 EOF
 
-echo "✅ XML & Launch configs synced."
+# 2. Update setup.py to include the new entry point
+if [ -f "src/chopper-brain/setup.py" ]; then
+    if ! grep -q "motor_node =" src/chopper-brain/setup.py; then
+        echo "📝 Updating setup.py entry points..."
+        sed -i '' "/'spektrum_node =/a \\
+            'motor_node = chopper_brain.motor_node:main'," src/chopper-brain/setup.py
+    fi
+fi
+
+# 3. Add Motor Node to the Launch File
+if [ -f "src/chopper-description/launch/robot-launch.py" ]; then
+    if ! grep -q "executable='motor_node'" src/chopper-description/launch/robot-launch.py; then
+        echo "🚀 Adding Motor Node to robot-launch.py..."
+        sed -i '' "/Node(/i \\
+        Node(package='chopper_brain', executable='motor_node', name='motor_controller')," src/chopper-description/launch/robot-launch.py
+    fi
+fi
+
+chmod +x "$BRAIN_PYTHON_DIR/motor_node.py"
+echo "✅ Motor interface logic added. Run 'make ros-build'."

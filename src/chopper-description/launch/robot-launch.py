@@ -10,14 +10,14 @@ def generate_launch_description():
     robot_description_config = xacro.process_file(xacro_file)
 
     return LaunchDescription([
-        Node(
+        Node(package='chopper_brain', executable='motor_node', name='motor_controller'),        Node(
             package='robot_state_publisher',
             executable='robot_state_publisher',
             name='robot_state_publisher',
             output='screen',
             parameters=[{'robot_description': robot_description_config.toxml()}]
         ),
-        Node(
+        Node(package='chopper_brain', executable='motor_node', name='motor_controller'),        Node(
             package='chopper_brain',
             executable='spektrum_node',
             name='spektrum_bridge',
