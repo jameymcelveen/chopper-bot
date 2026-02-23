@@ -1,0 +1,60 @@
+# == scaffold.sh ==
+scaffold.sh
+
+# === ROS 2 / Colcon Build Artifacts ===
+# Ignore the generated build, install, and log folders
+build/
+install/
+log/
+# Ignore the COLCON_IGNORE marker file if used
+COLCON_IGNORE
+
+# === Python Environment ===
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+.python-version
+# Distribution / packaging
+dist/
+eggs/
+.eggs/
+*.egg-info/
+*.egg
+
+# === IDEs: Cursor & JetBrains (IntelliJ/PyCharm/CLion) ===
+# JetBrains local project settings (workspace.xml can be huge and contains local paths)
+.idea/
+*.iml
+*.iws
+
+# Cursor & VS Code specific settings
+.vscode/
+.cursor/
+# Ignore Cursor's AI indexing cache if it's local
+.cursor-cache/
+
+# === OS Specific ===
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# === 3D Modeling / Fabrication ===
+# Ignore high-poly STL/OBJ files that should be handled by LFS or stored elsewhere
+*.stl
+*.obj
+*.step
+*.stp
+# Slicer files for your Bambu H2C
+*.3mf
+*.gcode
+
+# === Docker & Local Env ===
+.env
+.env.local
