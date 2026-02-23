@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: chopper-dev
-    volumes:
+    runtime: nvidia    volumes:
       - .:/ros_ws
     environment:
       - ROS_DOMAIN_ID=42
