@@ -11,7 +11,7 @@ class SpektrumBridge(Node):
         # Jetson Nano UART port (/dev/ttyTHS1 is J41 pins 8/10)
         # Using 115200 as standard for Jetson UART compatibility
         self.ser = serial.Serial('/dev/ttyTHS1', 115200, timeout=0.01)
-        self.timer = self.create_timer(0.01, self.timer_callback)
+        self.ser.reset_input_buffer()        self.timer = self.create_timer(0.01, self.timer_callback)
         self.get_logger().info("Spektrum Bridge Started - Listening on /dev/ttyTHS1")
 
     def timer_callback(self):

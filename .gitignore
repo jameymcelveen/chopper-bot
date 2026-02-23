@@ -1,6 +1,3 @@
-# == scaffold.sh ==
-scaffold.sh
-
 # === ROS 2 / Colcon Build Artifacts ===
 # Ignore the generated build, install, and log folders
 build/

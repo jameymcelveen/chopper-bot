@@ -33,6 +33,11 @@ clean: ## Remove build, install, and log folders
 test: ## Run ROS 2 tests
 	docker exec -it $(CONTAINER_NAME) bash -c "source install/setup.bash && colcon test"
 
+# --- Gemini Commands ---
+.PHONY: gemini
+gemini: ## Apply Gemini's Idempotent Patches
+	./scripts/Gemini.sh
+
 # --- Launch Commands ---
 .PHONY: run-spektrum
 run-spektrum: ## Launch the Spektrum Bridge node
