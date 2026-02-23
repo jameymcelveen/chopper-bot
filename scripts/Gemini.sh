@@ -1,70 +1,61 @@
 #!/bin/bash
 
 # --- Configuration ---
-PROJECT_NAME="chopper-bot"
 BRAIN_PKG_DIR="src/chopper-brain"
-BRAIN_PYTHON_DIR="$BRAIN_PKG_DIR/chopper_brain" # Correct underscore for Python
+DESC_PKG_DIR="src/chopper-description"
 
-echo "🚀 Applying Gemini's Idempotent Patches..."
+echo "🛠 Syncing Dependencies & URDF Launchers..."
 
-# 1. Ensure Python Package Structure (Underscore Fix)
-if [ ! -d "$BRAIN_PYTHON_DIR" ]; then
-    echo "🔧 Fixing Python package naming (dash to underscore)..."
-    mkdir -p "$BRAIN_PYTHON_DIR"
-    touch "$BRAIN_PYTHON_DIR/__init__.py"
-    # Move node if it was in the wrong place
-    [ -f "src/chopper-brain/chopper-brain/spektrum_node.py" ] && mv "src/chopper-brain/chopper-brain/spektrum_node.py" "$BRAIN_PYTHON_DIR/"
-fi
+# 1. Sync package.xml dependencies for chopper-brain
+# Using a simple grep check before appending to avoid duplicates
+sync_dependency() {
+    local pkg_file=$1
+    local dep=$2
+    if ! grep -q "<exec_depend>$dep</exec_depend>" "$pkg_file"; then
+        echo "➕ Adding $dep to $pkg_file"
+        # Insert before the closing </package> tag
+        sed -i '' "/<\/package>/i \\
+  <exec_depend>$dep</exec_depend>" "$pkg_file"
+    fi
+}
 
-# 2. Update docker-compose.yml to include Serial Device Mapping
-if ! grep -q "devices:" docker-compose.yml; then
-    echo "🔌 Mapping /dev/ttyTHS1 into Docker..."
-    # Uses sed to insert the device mapping after the privileged line
-    sed -i '' '/privileged: true/a \
-    devices:\
-      - "/dev/ttyTHS1:/dev/ttyTHS1"' docker-compose.yml
-fi
+[ -f "$BRAIN_PKG_DIR/package.xml" ] && sync_dependency "$BRAIN_PKG_DIR/package.xml" "python3-serial"
+[ -f "$BRAIN_PKG_DIR/package.xml" ] && sync_dependency "$BRAIN_PKG_DIR/package.xml" "geometry_msgs"
 
-# 3. Enhance spektrum_node.py with Failsafe & Buffer Flush
-# This checks if the reset_input_buffer code is already there
-if [ -f "$BRAIN_PYTHON_DIR/spektrum_node.py" ] && ! grep -q "reset_input_buffer" "$BRAIN_PYTHON_DIR/spektrum_node.py"; then
-    echo "🛡 Adding Serial Failsafe to spektrum_node.py..."
-    # Inject buffer reset into __init__
-    sed -i '' '/self.ser = serial.Serial/a \
-        self.ser.reset_input_buffer()' "$BRAIN_PYTHON_DIR/spektrum_node.py"
-fi
+# 2. Add Xacro support to chopper-description
+[ -f "$DESC_PKG_DIR/package.xml" ] && sync_dependency "$DESC_PKG_DIR/package.xml" "xacro"
+[ -f "$DESC_PKG_DIR/package.xml" ] && sync_dependency "$DESC_PKG_DIR/package.xml" "robot_state_publisher"
 
-# 4. Create display.launch.py (if it doesn't exist)
-LAUNCH_DIR="src/chopper-description/launch"
-mkdir -p "$LAUNCH_DIR"
-if [ ! -f "$LAUNCH_DIR/display-launch.py" ]; then
-    echo "📺 Creating Rviz display launch file..."
-    cat <<EOF > "$LAUNCH_DIR/display-launch.py"
-from launch import LaunchDescription
-from launch_ros.actions import Node
+# 3. Create a professional Robot Launch file
+# This version actually handles Xacro processing for the Orin Nano
+mkdir -p "$DESC_PKG_DIR/launch"
+cat <<EOF > "$DESC_PKG_DIR/launch/robot-launch.py"
 import os
 from ament_index_python.packages import get_package_share_directory
+from launch import LaunchDescription
+from launch_ros.actions import Node
+import xacro
 
 def generate_launch_description():
+    pkg_path = get_package_share_directory('chopper_description')
+    xacro_file = os.path.join(pkg_path, 'urdf', 'chopper.urdf.xacro')
+    robot_description_config = xacro.process_file(xacro_file)
+
     return LaunchDescription([
         Node(
             package='robot_state_publisher',
             executable='robot_state_publisher',
             name='robot_state_publisher',
-            parameters=[{'robot_description': 'placeholder'}] # Will be xacro later
+            output='screen',
+            parameters=[{'robot_description': robot_description_config.toxml()}]
         ),
         Node(
             package='chopper_brain',
             executable='spektrum_node',
-            name='spektrum_bridge'
+            name='spektrum_bridge',
+            output='screen'
         )
     ])
 EOF
-fi
 
-# 5. Finalize setup.py Entry Points
-if [ -f "$BRAIN_PKG_DIR/setup.py" ]; then
-    sed -i '' "s/chopper-brain.spektrum_node/chopper_brain.spektrum_node/g" "$BRAIN_PKG_DIR/setup.py"
-fi
-
-echo "✅ Patches applied. You can now run 'make ros-build'."
+echo "✅ XML & Launch configs synced."
