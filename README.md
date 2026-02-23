@@ -42,6 +42,6 @@ This project bridges the gap between hobbyist RC builds and professional "Physic
 
 1. Clone the repository:
    ```bash
-   git clone [https://github.com/your-username/chopper-bot.git](https://github.com/your-username/chopper-bot.git)
+   git clone https://github.com/jameymcelveen/chopper-bot.git
    cd chopper-bot
    ```
