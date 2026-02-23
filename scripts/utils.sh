@@ -1,42 +1,39 @@
 #!/bin/bash
 
-# Function to copy to clipboard
 copy_to_clipboard() {
     local CONTENT="$1"
     if [[ "$OSTYPE" == "darwin"* ]]; then
         echo -n "$CONTENT" | pbcopy
-    elif command -v clip.exe &> /dev/null; then
-        echo -n "$CONTENT" | clip.exe
-    elif command -v xclip &> /dev/null; then
-        echo -n "$CONTENT" | xclip -selection clipboard
     else
-        echo "⚠️ No clipboard utility found."
+        # Fallback for Linux environments
+        echo -n "$CONTENT" | xclip -selection clipboard 2>/dev/null || echo -n "$CONTENT" > /tmp/perry_msg
     fi
 }
 
-# Function to get content from clipboard
 paste_from_clipboard() {
     if [[ "$OSTYPE" == "darwin"* ]]; then
         pbpaste
-    elif command -v powershell.exe &> /dev/null; then
-        powershell.exe -command "Get-Clipboard"
-    elif command -v xclip &> /dev/null; then
-        xclip -selection clipboard -o
     else
-        echo "unknown_commit_msg"
+        cat /tmp/perry_msg 2>/dev/null || echo "manual commit"
     fi
 }
 
-# New function to handle the git flow
 commit_with_clipboard() {
     local MSG=$(paste_from_clipboard)
-    if [ "$MSG" == "unknown_commit_msg" ] || [ -z "$MSG" ]; then
-        echo "❌ Error: Clipboard empty or utility missing."
-        return 1
+    
+    if [ -z "$MSG" ]; then
+        echo "❌ Error: Clipboard is empty. Cannot commit."
+        exit 1
     fi
     
-    echo "💾 Committing with message: $MSG"
+    echo "💾 Attempting to commit with message: '$MSG'"
+    
     git add .
-    git commit -m "$MSG"
-    git push
+    # The -m flag needs the variable quoted to handle spaces
+    if git commit -m "$MSG"; then
+        echo "✅ Commit successful. Pushing..."
+        git push
+    else
+        echo "⚠️ Git commit failed (maybe nothing to commit?)."
+    fi
 }
