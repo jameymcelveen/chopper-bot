@@ -35,8 +35,12 @@ test: ## Run ROS 2 tests
 
 # --- Gemini Commands ---
 .PHONY: gemini
-gemini: ## Apply Gemini's Idempotent Patches
+gemini: ## Run the patch script and auto-commit changes
 	./scripts/Gemini.sh
+	git add .
+	@echo "Committing with message from clipboard..."
+	git commit -m "$$(pbpaste)"
+	git push
 
 # --- Launch Commands ---
 .PHONY: run-spektrum
