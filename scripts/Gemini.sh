@@ -1,63 +1,34 @@
 #!/bin/bash
 
 # --- Configuration ---
-BRAIN_PYTHON_DIR="src/chopper-brain/chopper_brain"
+PROJECT_ROOT=$(pwd)
+AI_SEED_FILE="ai.md"
 
-echo "⚙️ Adding Motor Logic & PWM Bridge..."
+echo "💾 Seeding Project Context & Adding Clipboard Automation..."
 
-# 1. Create the Motor Controller Node
-cat <<EOF > "$BRAIN_PYTHON_DIR/motor_node.py"
-import rclpy
-from rclpy.node import Node
-from geometry_msgs.msg import Twist
-
-class MotorController(Node):
-    def __init__(self):
-        super().__init__('motor_controller')
-        self.subscription = self.create_subscription(
-            Twist,
-            'cmd_vel',
-            self.listener_callback,
-            10)
-        self.get_logger().info("Motor Controller Node Initialized")
-
-    def listener_callback(self, msg):
-        # Differential Drive Kinematics
-        linear = msg.linear.x
-        angular = msg.angular.z
-        
-        # Calculate Left and Right wheel speeds (-1.0 to 1.0)
-        left_speed = linear - angular
-        right_speed = linear + angular
-        
-        # TODO: Send these values to your specific ESCs/Motor Drivers
-        # self.get_logger().info(f"Speeds -> L: {left_speed:.2f}, R: {right_speed:.2f}")
-
-def main(args=None):
-    rclpy.init(args=args)
-    node = MotorController()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+# 1. Create/Update ai.md (The Project "Memory Bank")
+# This file is for seeding the AI in future sessions
+cat <<EOF > "$AI_SEED_FILE"
+# Chopper-Bot Project Context (Seed File)
+- **Target Hardware:** NVIDIA Jetson Orin Nano (8GB)
+- **Architecture:** ROS 2 Humble / Docker (ARM64) / Mac Dev Host
+- **Naming Convention:** Dash-case for paths/files, underscore for Python packages.
+- **Spektrum Logic:** DSMX Satellite via UART (/dev/ttyTHS1), 115200 baud, 16-byte frames.
+- **Safety:** Killswitch on Ch5 (Aux1).
+- **Current Status:** Spektrum parsing implemented, Motor Node scaffolded.
 EOF
 
-# 2. Update setup.py to include the new entry point
-if [ -f "src/chopper-brain/setup.py" ]; then
-    if ! grep -q "motor_node =" src/chopper-brain/setup.py; then
-        echo "📝 Updating setup.py entry points..."
-        sed -i '' "/'spektrum_node =/a \\
-            'motor_node = chopper_brain.motor_node:main'," src/chopper-brain/setup.py
-    fi
+# 2. Add the Git Commit Clipboard Helper to the end of THIS script
+# We'll use a temporary file to hold the suggested message
+COMMIT_MSG="feat: implement ai.md seed and pbcopy automation for mac workflow"
+
+# Check if we are on a Mac to avoid errors on the Jetson
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    echo -n "$COMMIT_MSG" | pbcopy
+    echo "📋 Suggested commit message copied to Mac clipboard: \"$COMMIT_MSG\""
+else
+    echo "📝 Suggested commit message (No pbcopy on Linux): \"$COMMIT_MSG\""
 fi
 
-# 3. Add Motor Node to the Launch File
-if [ -f "src/chopper-description/launch/robot-launch.py" ]; then
-    if ! grep -q "executable='motor_node'" src/chopper-description/launch/robot-launch.py; then
-        echo "🚀 Adding Motor Node to robot-launch.py..."
-        sed -i '' "/Node(/i \\
-        Node(package='chopper_brain', executable='motor_node', name='motor_controller')," src/chopper-description/launch/robot-launch.py
-    fi
-fi
-
-chmod +x "$BRAIN_PYTHON_DIR/motor_node.py"
-echo "✅ Motor interface logic added. Run 'make ros-build'."
+# Ensure gitignore handles the seed if needed (optional)
+# if ! grep -q "ai.md" .gitignore; then echo "ai.md" >> .gitignore; fi
