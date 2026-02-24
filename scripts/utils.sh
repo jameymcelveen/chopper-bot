@@ -1,39 +1,40 @@
 #!/bin/bash
 
+# Use the physical path of the script to find root
+UTILS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+REPO_ROOT="$( cd "$UTILS_DIR/.." && pwd )"
+MSG_CACHE="$REPO_ROOT/.gemini_msg"
+
 copy_to_clipboard() {
     local CONTENT="$1"
+    echo -n "$CONTENT" > "$MSG_CACHE"
     if [[ "$OSTYPE" == "darwin"* ]]; then
         echo -n "$CONTENT" | pbcopy
-    else
-        # Fallback for Linux environments
-        echo -n "$CONTENT" | xclip -selection clipboard 2>/dev/null || echo -n "$CONTENT" > /tmp/perry_msg
-    fi
-}
-
-paste_from_clipboard() {
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        pbpaste
-    else
-        cat /tmp/perry_msg 2>/dev/null || echo "manual commit"
     fi
 }
 
 commit_with_clipboard() {
-    local MSG=$(paste_from_clipboard)
+    # Move to root explicitly
+    cd "$REPO_ROOT" || exit 1
     
-    if [ -z "$MSG" ]; then
-        echo "❌ Error: Clipboard is empty. Cannot commit."
-        exit 1
-    fi
+    # Stage EVERYTHING: modified, deleted, and untracked (like .gemini_msg)
+    git add -A 
     
-    echo "💾 Attempting to commit with message: '$MSG'"
-    
-    git add .
-    # The -m flag needs the variable quoted to handle spaces
-    if git commit -m "$MSG"; then
-        echo "✅ Commit successful. Pushing..."
-        git push
+    local MSG=""
+    if [ -f "$MSG_CACHE" ]; then
+        MSG=$(cat "$MSG_CACHE")
     else
-        echo "⚠️ Git commit failed (maybe nothing to commit?)."
+        MSG="chore: automated sync $(date +%Y%m%d_%H%M%S)"
+    fi
+
+    echo "💾 Staging and committing: $MSG"
+    
+    # Commit and Push
+    if git commit -m "$MSG"; then
+        echo "🚀 Pushing to origin..."
+        git push
+        rm -f "$MSG_CACHE"
+    else
+        echo "⚠️ Git reports nothing to commit."
     fi
 }
