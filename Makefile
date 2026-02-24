@@ -36,8 +36,7 @@ test: ## Run ROS 2 tests
 # --- Gemini Commands ---
 .PHONY: gemini
 gemini: ## Run the patcher and auto-commit
-	bash scripts/gemini.sh
-	python3 scripts/commit.py
+	python3 scripts/sync.py
 
 # --- Launch Commands ---
 .PHONY: run-spektrum
